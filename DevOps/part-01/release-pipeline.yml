@@ -1,0 +1,95 @@
+trigger: none
+
+pool:
+  vmImage: windows-latest
+
+variables:
+- name: location
+  value: northeurope
+
+- name: artifactName
+  value: LogicApps
+
+- name: logicappName
+  value: la-cms-integraiton-02
+
+- name: targetResourceGroupName
+  value: rg-cms-deployment-02
+
+- name: cosmosAccountName
+  value: 'cosno-cms-integration-02'
+
+- name: env_dev
+  value: dev
+
+- name: env_uat
+  value: uat
+
+stages:
+  - stage: 'PublishingArtifacts'
+    displayName: 'Publishing artifacts'
+    jobs:
+      - job: 'Publishing'
+        steps:
+        - task: CopyFiles@2
+          displayName: Copy files
+          inputs:
+            SourceFolder: '$(Build.SourcesDirectory)'
+            Contents: '**'
+            TargetFolder: '$(Build.ArtifactStagingDirectory)'
+
+        - task: PublishBuildArtifacts@1
+          displayName:  Publish build artifacts
+          inputs:
+            PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+            ArtifactName: '$(artifactName)'
+
+  - stage: 'Deployment_DEV'
+    displayName: 'Deployment to ${{ variables.env_dev }}'
+    dependsOn:
+    - PublishingArtifacts
+    variables:
+    - group: Demo-deployment-dev
+    jobs:
+    - deployment: 'Deployment_to_Azure_environment'
+      displayName: 'Deployment to ${{ variables.env_dev }}'
+      environment: $(env_dev)
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+                - task: AzureResourceManagerTemplateDeployment@3 
+                  displayName: CosmosDB deployment
+                  inputs:
+                    deploymentName: 'CosmosDB-DevOps-pipeline-$(Build.BuildNumber)'
+                    deploymentScope: 'Resource Group'
+                    azureResourceManagerConnection: $(azureTenantConnectionName)
+                    subscriptionId: $(azureSubscriptionId)
+                    action: 'Create Or Update Resource Group'
+                    resourceGroupName: $(targetResourceGroupName)-$(env_dev)
+                    location: ${{ variables.location }}
+                    templateLocation: 'Linked artifact'
+                    csmFile: $(Agent.WorkFolder)\1\${{ variables.artifactName }}\CosmosDB\cosmosdb.bicep
+                    overrideParameters: >
+                      -account_name $(cosmosAccountName)
+                      -database_name 'DemoDB'
+                      -container_name 'Customers'
+                    deploymentMode: 'Incremental'
+
+                - task: AzureResourceManagerTemplateDeployment@3 
+                  displayName: LogicApp deployment
+                  inputs:
+                    deploymentName: 'LogicApps-DevOps-pipeline-$(Build.BuildNumber)'
+                    deploymentScope: 'Resource Group'
+                    azureResourceManagerConnection: $(azureTenantConnectionName)
+                    subscriptionId: $(azureSubscriptionId)
+                    action: 'Create Or Update Resource Group'
+                    resourceGroupName: $(targetResourceGroupName)-$(env_dev)
+                    location: ${{ variables.location }}
+                    templateLocation: 'Linked artifact'
+                    csmFile: $(Agent.WorkFolder)\1\${{ variables.artifactName }}\LogicApps\logicapps.bicep
+                    overrideParameters: >
+                      -logic_app_name $(logicappName)
+                      -cosmosdb_account_name $(cosmosAccountName)
+                      -location ${{ variables.location }}
+                    deploymentMode: 'Incremental'
