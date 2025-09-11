@@ -1,0 +1,262 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workflows_la_sharepoint_agent_name": {
+            "defaultValue": "la-sharepoint-agent",
+            "type": "String"
+        },
+        "userAssignedIdentities_mi_sharepoint_agent_externalid": {
+            "defaultValue": "/subscriptions/<subscription-id>/resourceGroups/gr-mkh-demo-part12/providers/Microsoft.ManagedIdentity/userAssignedIdentities/mi-sharepoint-agent",
+            "type": "String"
+        },
+        "connections_azureblob_externalid": {
+            "defaultValue": "/subscriptions/<subscription-id>/resourceGroups/gr-mkh-demo-part12/providers/Microsoft.Web/connections/azureblob",
+            "type": "String"
+        }
+    },
+    "variables": {},
+    "resources": [
+        {
+            "type": "Microsoft.Logic/workflows",
+            "apiVersion": "2017-07-01",
+            "name": "[parameters('workflows_la_sharepoint_agent_name')]",
+            "location": "northcentralus",
+            "identity": {
+                "type": "UserAssigned",
+                "userAssignedIdentities": {
+                    "/subscriptions/<subscription-id>/resourceGroups/gr-mkh-demo-part12/providers/Microsoft.ManagedIdentity/userAssignedIdentities/mi-sharepoint-agent": {}
+                }
+            },
+            "properties": {
+                "state": "Enabled",
+                "definition": {
+                    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {
+                        "$connections": {
+                            "defaultValue": {},
+                            "type": "Object"
+                        }
+                    },
+                    "triggers": {
+                        "When_a_blob_is_added_or_modified_(properties_only)_(V2)": {
+                            "recurrence": {
+                                "interval": 3,
+                                "frequency": "Minute",
+                                "timeZone": "Romance Standard Time",
+                                "startTime": "2025-08-18T10:00:00"
+                            },
+                            "evaluatedRecurrence": {
+                                "interval": 3,
+                                "frequency": "Minute",
+                                "timeZone": "Romance Standard Time",
+                                "startTime": "2025-08-18T10:00:00"
+                            },
+                            "splitOn": "@triggerBody()",
+                            "metadata": {
+                                "JTJmZG9jdW1lbnRz": "/documents"
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['azureblob']['connectionId']"
+                                    }
+                                },
+                                "method": "get",
+                                "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('AccountNameFromSettings'))}/triggers/batch/onupdatedfile",
+                                "queries": {
+                                    "folderId": "JTJmZG9jdW1lbnRz",
+                                    "maxFileCount": 10,
+                                    "checkBothCreatedAndModifiedDateTime": false
+                                }
+                            }
+                        }
+                    },
+                    "actions": {
+                        "GetDocuments": {
+                            "runAfter": {
+                                "UploadDocument": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Http",
+                            "inputs": {
+                                "uri": "https://graph.microsoft.com/v1.0/drives/@{body('GetLibraryByName')[0]['id']}/root/children",
+                                "method": "GET",
+                                "authentication": {
+                                    "type": "ManagedServiceIdentity",
+                                    "identity": "[parameters('userAssignedIdentities_mi_sharepoint_agent_externalid')]",
+                                    "audience": "https://graph.microsoft.com"
+                                }
+                            },
+                            "runtimeConfiguration": {
+                                "contentTransfer": {
+                                    "transferMode": "Chunked"
+                                }
+                            }
+                        },
+                        "GetAllLibraries": {
+                            "runAfter": {
+                                "GetAllListsAndLibraries": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Http",
+                            "inputs": {
+                                "uri": "https://graph.microsoft.com/v1.0/sites/demodomain.sharepoint.com:/sites/ProjectDemo:/drives",
+                                "method": "GET",
+                                "authentication": {
+                                    "type": "ManagedServiceIdentity",
+                                    "identity": "[parameters('userAssignedIdentities_mi_sharepoint_agent_externalid')]",
+                                    "audience": "https://graph.microsoft.com"
+                                }
+                            },
+                            "runtimeConfiguration": {
+                                "contentTransfer": {
+                                    "transferMode": "Chunked"
+                                }
+                            }
+                        },
+                        "GetAllListsAndLibraries": {
+                            "runAfter": {
+                                "Get_blob_content_(V2)": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Http",
+                            "inputs": {
+                                "uri": "https://graph.microsoft.com/v1.0/sites/demodomain.sharepoint.com:/sites/MkhDemoSite:/lists",
+                                "method": "GET",
+                                "authentication": {
+                                    "type": "ManagedServiceIdentity",
+                                    "identity": "[parameters('userAssignedIdentities_mi_sharepoint_agent_externalid')]",
+                                    "audience": "https://graph.microsoft.com"
+                                }
+                            },
+                            "runtimeConfiguration": {
+                                "contentTransfer": {
+                                    "transferMode": "Chunked"
+                                }
+                            }
+                        },
+                        "GetDocumentMetadata": {
+                            "runAfter": {
+                                "GetDocuments": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Http",
+                            "inputs": {
+                                "uri": "https://graph.microsoft.com/v1.0/drives/@{body('GetLibraryByName')[0]['id']}/root:/@{body('GetDocuments')['value'][0]['name']}",
+                                "method": "GET",
+                                "authentication": {
+                                    "type": "ManagedServiceIdentity",
+                                    "identity": "[parameters('userAssignedIdentities_mi_sharepoint_agent_externalid')]",
+                                    "audience": "https://graph.microsoft.com"
+                                }
+                            },
+                            "runtimeConfiguration": {
+                                "contentTransfer": {
+                                    "transferMode": "Chunked"
+                                }
+                            }
+                        },
+                        "GetDocumentContent": {
+                            "runAfter": {
+                                "GetDocumentMetadata": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Http",
+                            "inputs": {
+                                "uri": "@body('GetDocumentMetadata')['@microsoft.graph.downloadUrl']",
+                                "method": "GET",
+                                "authentication": {
+                                    "type": "ManagedServiceIdentity",
+                                    "identity": "[parameters('userAssignedIdentities_mi_sharepoint_agent_externalid')]",
+                                    "audience": "https://graph.microsoft.com"
+                                }
+                            },
+                            "runtimeConfiguration": {
+                                "contentTransfer": {
+                                    "transferMode": "Chunked"
+                                }
+                            }
+                        },
+                        "UploadDocument": {
+                            "runAfter": {
+                                "GetLibraryByName": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Http",
+                            "inputs": {
+                                "uri": "https://graph.microsoft.com/v1.0/drives/@{body('GetLibraryByName')[0]['id']}/root:/@{triggerBody()?['Name']}:/content",
+                                "method": "PUT",
+                                "headers": {
+                                    "Content-Type": "@{body('Get_blob_content_(V2)')['$content-type']}"
+                                },
+                                "body": "@body('Get_blob_content_(V2)')['$content']",
+                                "authentication": {
+                                    "type": "ManagedServiceIdentity",
+                                    "identity": "[parameters('userAssignedIdentities_mi_sharepoint_agent_externalid')]",
+                                    "audience": "https://graph.microsoft.com"
+                                }
+                            },
+                            "runtimeConfiguration": {
+                                "contentTransfer": {
+                                    "transferMode": "Chunked"
+                                }
+                            }
+                        },
+                        "GetLibraryByName": {
+                            "runAfter": {
+                                "GetAllLibraries": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Query",
+                            "inputs": {
+                                "from": "@body('GetAllLibraries')['value']",
+                                "where": "@equals(item()['name'], 'Documents')"
+                            }
+                        },
+                        "Get_blob_content_(V2)": {
+                            "runAfter": {},
+                            "metadata": {
+                                "JTJmZG9jdW1lbnRzJTJmU2hhcmVQb2ludC1xdWljay1zdGFydC1ndWlkZS5wZGY=": "/documents/SharePoint-quick-start-guide.pdf"
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['azureblob']['connectionId']"
+                                    }
+                                },
+                                "method": "get",
+                                "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('AccountNameFromSettings'))}/files/@{encodeURIComponent(encodeURIComponent('/documents/',triggerBody()?['Name']))}/content",
+                                "queries": {
+                                    "inferContentType": true
+                                }
+                            }
+                        }
+                    },
+                    "outputs": {}
+                },
+                "parameters": {
+                    "$connections": {
+                        "value": {
+                            "azureblob": {
+                                "id": "/subscriptions/<subscription-id>/providers/Microsoft.Web/locations/northcentralus/managedApis/azureblob",
+                                "connectionId": "[parameters('connections_azureblob_externalid')]",
+                                "connectionName": "azureblob"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    ]
+}
