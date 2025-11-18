@@ -1,0 +1,119 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Response": {
+        "type": "Response",
+        "kind": "Http",
+        "inputs": {
+          "statusCode": 200,
+          "body": "@outputs('Compose_Output')"
+        },
+        "runAfter": {
+          "Compose_Output": [
+            "SUCCEEDED"
+          ]
+        }
+      },
+      "GeneratePassword": {
+        "type": "CSharpScriptCode",
+        "inputs": {
+          "CodeFile": "execute_csharp_generate_password.csx"
+        },
+        "runAfter": {}
+      },
+      "ParseDate": {
+        "type": "CSharpScriptCode",
+        "inputs": {
+          "CodeFile": "execute_csharp_parse_date.csx"
+        },
+        "runAfter": {
+          "GeneratePassword": [
+            "SUCCEEDED"
+          ]
+        }
+      },
+      "Compose_Output": {
+        "type": "Compose",
+        "inputs": {
+          "password": "@actions('GeneratePassword').outputs.body.password",
+          "date": "@actions('ParseDate').outputs.body.date",
+          "emails": "@actions('ExtractEmails').outputs.body.emails",
+          "fruits": "@actions('DistinctStrings').outputs.body.fruits",
+          "hash": "@actions('CalculateHash').outputs.body.hash",
+          "convertedCsv": "@actions('CsvToJson').outputs.body.convertedCsv",
+          "maskedText": "@actions('MaskSensitiveData').outputs.body.text"
+        },
+        "runAfter": {
+          "MaskSensitiveData": [
+            "SUCCEEDED"
+          ]
+        }
+      },
+      "ExtractEmails": {
+        "type": "CSharpScriptCode",
+        "inputs": {
+          "CodeFile": "execute_csharp_extract_emails.csx"
+        },
+        "runAfter": {
+          "ParseDate": [
+            "SUCCEEDED"
+          ]
+        }
+      },
+      "DistinctStrings": {
+        "type": "CSharpScriptCode",
+        "inputs": {
+          "CodeFile": "execute_csharp_distinct_strings.csx"
+        },
+        "runAfter": {
+          "ExtractEmails": [
+            "SUCCEEDED"
+          ]
+        }
+      },
+      "CalculateHash": {
+        "type": "CSharpScriptCode",
+        "inputs": {
+          "CodeFile": "execute_csharp_calculate_hash.csx"
+        },
+        "runAfter": {
+          "DistinctStrings": [
+            "SUCCEEDED"
+          ]
+        }
+      },
+      "CsvToJson": {
+        "type": "CSharpScriptCode",
+        "inputs": {
+          "CodeFile": "execute_csharp_csv_to_json.csx"
+        },
+        "runAfter": {
+          "CalculateHash": [
+            "SUCCEEDED"
+          ]
+        }
+      },
+      "MaskSensitiveData": {
+        "type": "CSharpScriptCode",
+        "inputs": {
+          "CodeFile": "execute_csharp_mask_sensitive_data.csx"
+        },
+        "runAfter": {
+          "CsvToJson": [
+            "SUCCEEDED"
+          ]
+        }
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "triggers": {
+      "When_a_HTTP_request_is_received": {
+        "type": "Request",
+        "kind": "Http"
+      }
+    }
+  },
+  "kind": "Stateful"
+}
