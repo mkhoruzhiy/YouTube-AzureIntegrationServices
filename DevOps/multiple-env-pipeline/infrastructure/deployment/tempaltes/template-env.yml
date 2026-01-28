@@ -1,0 +1,40 @@
+parameters:
+- name: env
+  type: string
+
+- name: logicAppTemplatePath
+  type: string
+
+- name: resourceGroupName
+  type: string
+
+- name: location
+  type: string
+
+jobs:
+- deployment: 'Deployment_to_Azure_environment'
+  displayName: 'Deployment to environment ${{ parameters.env }}'
+  environment: '${{ parameters.env }}'
+  strategy:
+    runOnce:
+      deploy:
+        steps:
+        - checkout: self
+
+        # LogicApp deployment
+        - task: AzureResourceManagerTemplateDeployment@3 
+          displayName: LogicApp deployment
+          inputs:
+            deploymentName: LogicApps-DevOps-pipeline-$(Build.BuildNumber)
+            deploymentScope: 'Resource Group'
+            azureResourceManagerConnection: $(ServiceConnectionName)
+            subscriptionId: $(SubscriptionId)
+            action: 'Create Or Update Resource Group'
+            resourceGroupName: ${{ parameters.resourceGroupName }}
+            location: ${{ parameters.location }}
+            templateLocation: 'Linked artifact'
+            csmFile: $(Build.SourcesDirectory)/${{ parameters.logicAppTemplatePath }}
+            overrideParameters: >
+              -logicapp_name logic-demo-${{ parameters.env }}
+              -backend_url $(DestinationEndpoint)
+            deploymentMode: Incremental

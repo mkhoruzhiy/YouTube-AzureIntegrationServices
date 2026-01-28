@@ -1,0 +1,40 @@
+parameters:
+- name: environments
+  type: object
+  default:
+  - name: dev
+    stage: Deployment_DEV
+    dependson: PublishingArtifacts
+
+- name: variableGroupName
+  type: string
+
+- name: resourceGroupName
+  type: string
+
+- name: location
+  type: string
+
+- name: logicAppTemplatePath
+  type: string
+
+#--------------------------------------------------------------------
+stages:
+- ${{ each environment in parameters.environments }} :
+  - stage: ${{ environment.stage }}
+    displayName: 'Deployment to ${{ environment.name }}'
+    ${{ if ne(environment.dependson, '') }}:
+      dependsOn:
+      - ${{ environment.dependson }}
+    condition: and(succeeded(), not(eq('${{ parameters.integrationType }}', 'UNASSIGNED')))
+    variables:
+    - group: ${{ parameters.variableGroupName }}-${{ environment.name }}
+    # - group: Integration-keyvault-${{ environment.name }}
+
+    jobs:
+    - template: ./template-env.yml
+      parameters:
+        env: ${{ environment.name }}
+        resourceGroupName: ${{ parameters.resourceGroupName }}-${{ environment.name }}
+        logicAppTemplatePath: ${{ parameters.logicAppTemplatePath }}
+        location: ${{ parameters.location }}

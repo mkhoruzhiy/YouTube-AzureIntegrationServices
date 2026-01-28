@@ -1,0 +1,29 @@
+{
+  "id": "CUST-5551",
+  "fullName": {
+    "given": "John",
+    "family": "Doe"
+  },
+  "contact": {
+    "emailAddress": "john.doe@example.com",
+    "phoneNumber": "+1-555-123-4567"
+  },
+  "addresses": [
+    {
+      "type": "Billing",
+      "street": "123 Main St",
+      "city": "Seattle",
+      "state": "WA",
+      "postalCode": "98101",
+      "country": "USA"
+    },
+    {
+      "type": "Shipping",
+      "street": "123 Main St",
+      "city": "Seattle",
+      "state": "WA",
+      "postalCode": "98101",
+      "country": "USA"
+    }
+  ]
+}

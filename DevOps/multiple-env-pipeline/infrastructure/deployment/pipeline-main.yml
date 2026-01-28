@@ -1,0 +1,28 @@
+trigger: none
+
+pool:
+  vmImage: windows-latest
+
+variables:
+  variableGroupName: 'abc-integration'
+  resourceGroupName: 'rg-abc-integration'
+  location: 'East US'
+  logicAppTemplatePath: 'infrastructure/resources/logic-apps.bicep'
+  System.Debug: false
+
+stages:
+- template: ./tempaltes/template-all-env.yml
+  parameters:
+    variableGroupName: ${{ variables.variableGroupName }}
+    resourceGroupName: ${{ variables.resourceGroupName }}
+    logicAppTemplatePath: ${{ variables.logicAppTemplatePath }}
+    location: ${{ variables.location }}
+    environments:
+    - name: dev
+      stage: Deployment_DEV
+    - name: test
+      stage: Deployment_TEST
+      dependson: Deployment_DEV
+    - name: prod
+      stage: Deployment_PROD
+      dependson: Deployment_TEST
